@@ -2,13 +2,14 @@ const { chromium } = require('playwright-core');
 
 const base = process.env.BASE_URL || 'http://127.0.0.1:3002';
 const password = process.env.PM_TEST_PASSWORD;
+const proxy = process.env.SMOKE_PROXY ? { server: process.env.SMOKE_PROXY } : undefined;
 if (!password) {
   console.error('PM_TEST_PASSWORD is required');
   process.exit(1);
 }
 
 (async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, proxy });
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   const page = await context.newPage();
   const errors = [];
