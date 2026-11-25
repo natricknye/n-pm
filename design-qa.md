@@ -93,4 +93,4 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 - 四个状态分区和每个状态下的两个来源分组都正常渲染。
 - 登录后 10 个，本地表单创建/删除、任务/笔记、commit diff、退出 401 全部通过。
 - `npm test`：7/7；`npm run build`：通过。
-- 最终生产部署：`dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ`。
+- 最终生产部署：`dpl_2PXiwUWUGQHWNzbtQ1ZvDhoCbjz9`。

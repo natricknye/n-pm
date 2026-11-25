@@ -22,7 +22,7 @@ Live: `https://pm.natricknye.cn` — deployed and serving over HTTPS.
 - [x] Aliyun DNS: `pm` CNAME → `571a54a8621f89cb.vercel-dns-017.com.`
 - [x] Light theme + GitHub/local project sections + Contribute visibility
 
-Current production deployment: `dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ`
+Current production deployment: `dpl_2PXiwUWUGQHWNzbtQ1ZvDhoCbjz9`
 
 ## Stack
 
