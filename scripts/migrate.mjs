@@ -1,5 +1,16 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Pool } from '@neondatabase/serverless';
+
+const envFile = new URL('../.env.local', import.meta.url);
+if (!process.env.DATABASE_URL && existsSync(envFile)) {
+  for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!match) continue;
+    const [, key, raw] = match;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = raw.replace(/^['"]|['"]$/g, '');
+  }
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) {
