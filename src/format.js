@@ -1,8 +1,8 @@
 export const statusLabel = {
-  planning: '计划中',
-  active: '进行中',
-  paused: '暂停',
-  done: '完成',
+  active: '推进中',
+  planning: '初始',
+  paused: '暂缓中',
+  done: '归档',
 };
 
 export const priorityLabel = {

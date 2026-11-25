@@ -22,7 +22,7 @@ Live: `https://pm.natricknye.cn` — deployed and serving over HTTPS.
 - [x] Aliyun DNS: `pm` CNAME → `571a54a8621f89cb.vercel-dns-017.com.`
 - [x] Light theme + GitHub/local project sections + Contribute visibility
 
-Current production deployment: `dpl_Ar8LvSJ8AqVjVwKCrbpzBKhgLXGx`
+Current production deployment: `dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ`
 
 ## Stack
 
@@ -43,7 +43,8 @@ Why this shape:
 ## Features
 
 - Light, white-first UI
-- Project board split into **Uploaded to GitHub** and **Not uploaded to GitHub**
+- Project board split first by status: **推进中 / 初始 / 暂缓中 / 归档**
+- Inside each status, projects are split into **Uploaded to GitHub** and **Not uploaded to GitHub**
 - Project cards live on the main board; click any card to open the detail page
 - Ownership / Contribute tabs and per-project override
 - Change status from the card (login required) or the detail page

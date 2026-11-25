@@ -62,7 +62,7 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 
 ### 线上验证
 
-- 生产部署：`dpl_Ar8LvSJ8AqVjVwKCrbpzBKhgLXGx`
+- 生产部署：`dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ`
 - 公开看板：9 个（7 Ownership + 2 Contribute），两个来源分区正常。
 - 登录后：10 个（含私有 JIAO 和本地 math-paper）。
 - 本地项目详情：显示“本地项目”和本地路径，隐藏 Commits 标签。
@@ -76,3 +76,21 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 - `math-paper` 仍只在本地，尚未推到 GitHub。
 - Vercel Git 自动部署还需要 GitHub 登录连接；目前用 CLI 部署。
 - 本机对 `*.vercel.app` 有 DNS 污染，线上验收走 `pm.natricknye.cn` + 代理。
+
+## 2026-11-25 · 四状态分区
+
+### 这一版做了什么
+
+- 看板改成先按状态分区：**推进中 / 初始 / 暂缓中 / 归档**。
+- 每个状态下面再分 **已上传 GitHub** 和 **未上传 GitHub**。
+- 状态文案统一：`active → 推进中`、`planning → 初始`、`paused → 暂缓中`、`done → 归档`。
+- “添加本地项目”按钮移到页头，表单创建时仍可选状态。
+- 卡片上的状态下拉移动后，会落到对应状态分区。
+
+### 线上验证
+
+- 公开看板 9 个：推进中 8 个 GitHub + 1 个本地（math-paper），其余三个状态为空。
+- 四个状态分区和每个状态下的两个来源分组都正常渲染。
+- 登录后 10 个，本地表单创建/删除、任务/笔记、commit diff、退出 401 全部通过。
+- `npm test`：7/7；`npm run build`：通过。
+- 最终生产部署：`dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ`。

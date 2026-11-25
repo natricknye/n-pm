@@ -63,7 +63,7 @@ scripts/load-env.mjs       读取 .env.local
 scripts/setup-webhooks.ps1 批量配置 GitHub webhook
 src/main.jsx               React 入口（HashRouter）
 src/App.jsx                会话、布局、路由
-src/Board.jsx              白亮看板、GitHub/本地分区、本地项目表单、轮询
+src/Board.jsx              白亮看板、四状态分区、每个状态下 GitHub/本地分组、本地项目表单、轮询
 src/ProjectPage.jsx        详情、任务、笔记、commits/diff
 src/Login.jsx              单用户登录
 src/auth-context.jsx       AuthContext
@@ -131,6 +131,17 @@ owner.login === username     → ownership
 手动在 UI 改分类会写 `relation_source='manual'`；后续 sync 不会覆盖。Fork 默认 `contribute`，且公开看板默认可见；私有/archived 仍隐藏。
 
 ### 状态
+
+数据库仍用 `active / planning / paused / done`，UI 文案对应：
+
+```text
+active    推进中
+planning  初始
+paused    暂缓中
+done      归档
+```
+
+看板先按这四个状态分区，每个状态里再分“已上传 GitHub / 未上传 GitHub”。
 
 新仓库根据 `pushed_at`：
 
@@ -300,7 +311,7 @@ The "fileName" or "name" properties ... received "E:/.../index.html"
 ```text
 Vercel project     nate-pm
 Production domain  pm.natricknye.cn
-Deployment         dpl_Ar8LvSJ8AqVjVwKCrbpzBKhgLXGx
+Deployment         dpl_A8WxgUJiTuY6vBf9oy3YGNJGJPmJ
 Neon resource      n-pm-db（Vercel Marketplace，Free）
 Neon project       twilight-unit-04685252
 ```

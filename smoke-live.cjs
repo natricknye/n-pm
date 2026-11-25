@@ -32,7 +32,7 @@ if (!password) {
     console.log('public', JSON.stringify(await page.evaluate(() => ({
       title: document.title,
       cards: document.querySelectorAll('.project-card').length,
-      sections: [...document.querySelectorAll('.source-section h2')].map(item => item.innerText),
+      sections: [...document.querySelectorAll('.status-section h2')].map(item => item.innerText),
       tabs: [...document.querySelectorAll('.relation-tab')].map(item => item.innerText),
       privateTags: document.querySelectorAll('.tag.private').length,
       hasPrivateRepo: document.body.innerText.includes('JIAO'),

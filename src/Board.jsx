@@ -11,10 +11,10 @@ const RELATIONS = [
 ];
 
 const STATUSES = [
-  { id: 'active', label: '进行中' },
-  { id: 'planning', label: '计划中' },
-  { id: 'paused', label: '暂停' },
-  { id: 'done', label: '完成' },
+  { id: 'active', label: '推进中', description: '正在推进的项目' },
+  { id: 'planning', label: '初始', description: '刚立项或还在构思' },
+  { id: 'paused', label: '暂缓中', description: '暂时停下的项目' },
+  { id: 'done', label: '归档', description: '已完成或归档的项目' },
 ];
 
 const PRIORITIES = [
@@ -152,8 +152,6 @@ export default function Board() {
     () => projects.filter(project => relation === 'all' || project.relation === relation),
     [projects, relation]
   );
-  const githubProjects = visibleProjects.filter(project => !isLocal(project));
-  const localProjects = visibleProjects.filter(isLocal);
 
   const sync = async () => {
     setSyncing(true);
@@ -211,6 +209,16 @@ export default function Board() {
     }
   };
 
+  const renderProjects = items => items.map(project => (
+    <ProjectCard
+      key={project.id}
+      project={project}
+      auth={auth}
+      onStatus={updateStatus}
+      onOpen={id => navigate(`/p/${id}`)}
+    />
+  ));
+
   if (loading) {
     return <div className="loading">正在读取项目…</div>;
   }
@@ -228,6 +236,9 @@ export default function Board() {
         <div className="head-actions">
           {auth.authenticated ? (
             <>
+              <button type="button" className="btn primary" onClick={() => setShowLocalForm(value => !value)}>
+                {showLocalForm ? '收起表单' : '添加本地项目'}
+              </button>
               <button type="button" className="btn" onClick={sync} disabled={syncing}>
                 {syncing ? '同步中…' : '同步 GitHub'}
               </button>
@@ -293,139 +304,119 @@ export default function Board() {
         ))}
       </div>
 
-      <section className="source-section">
-        <div className="section-head">
-          <div>
-            <span className="eyebrow">GITHUB</span>
-            <h2>已上传 GitHub</h2>
-            <p className="muted">push、release、repository 事件会自动更新。</p>
-          </div>
-          <span className="section-count">{githubProjects.length} 个</span>
-        </div>
-        {githubProjects.length ? (
-          <div className="project-grid">
-            {githubProjects.map(project => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                auth={auth}
-                onStatus={updateStatus}
-                onOpen={id => navigate(`/p/${id}`)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="section-empty">这个分类下还没有已上传 GitHub 的项目。</div>
-        )}
-      </section>
-
-      <section className="source-section">
-        <div className="section-head">
-          <div>
-            <span className="eyebrow">LOCAL</span>
-            <h2>未上传 GitHub</h2>
-            <p className="muted">还没推到 GitHub 的项目，手动添加和维护。</p>
-          </div>
-          <div className="section-actions">
-            <span className="section-count">{localProjects.length} 个</span>
-            {auth.authenticated && (
-              <button type="button" className="btn primary" onClick={() => setShowLocalForm(value => !value)}>
-                {showLocalForm ? '收起表单' : '添加本地项目'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {auth.authenticated && showLocalForm && (
-          <form className="local-form" onSubmit={addLocalProject}>
-            <div className="form-grid">
-              <label className="field">
-                <span>项目名</span>
-                <input
-                  value={localForm.name}
-                  onChange={event => setLocalForm({ ...localForm, name: event.target.value })}
-                  placeholder="例如：math-paper"
-                  maxLength={120}
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>本地路径</span>
-                <input
-                  value={localForm.local_path}
-                  onChange={event => setLocalForm({ ...localForm, local_path: event.target.value })}
-                  placeholder="E:\path\to\project"
-                  maxLength={500}
-                />
-              </label>
-              <label className="field">
-                <span>分类</span>
-                <select
-                  value={localForm.relation}
-                  onChange={event => setLocalForm({ ...localForm, relation: event.target.value })}
-                >
-                  <option value="ownership">Ownership</option>
-                  <option value="contribute">Contribute</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>状态</span>
-                <select
-                  value={localForm.status}
-                  onChange={event => setLocalForm({ ...localForm, status: event.target.value })}
-                >
-                  {STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>优先级</span>
-                <select
-                  value={localForm.priority}
-                  onChange={event => setLocalForm({ ...localForm, priority: event.target.value })}
-                >
-                  {PRIORITIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-                </select>
-              </label>
-            </div>
+      {auth.authenticated && showLocalForm && (
+        <form className="local-form" onSubmit={addLocalProject}>
+          <div className="form-grid">
             <label className="field">
-              <span>描述</span>
-              <textarea
-                value={localForm.description}
-                onChange={event => setLocalForm({ ...localForm, description: event.target.value })}
-                placeholder="这个项目在做什么、现在到哪一步…"
-                rows={3}
-                maxLength={2000}
+              <span>项目名</span>
+              <input
+                value={localForm.name}
+                onChange={event => setLocalForm({ ...localForm, name: event.target.value })}
+                placeholder="例如：math-paper"
+                maxLength={120}
+                required
               />
             </label>
-            <div className="form-actions">
-              <button type="submit" className="btn primary" disabled={creating || !localForm.name.trim()}>
-                {creating ? '保存中…' : '保存本地项目'}
-              </button>
-              <button type="button" className="btn ghost" onClick={() => setShowLocalForm(false)}>
-                取消
-              </button>
-            </div>
-          </form>
-        )}
-
-        {localProjects.length ? (
-          <div className="project-grid">
-            {localProjects.map(project => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                auth={auth}
-                onStatus={updateStatus}
-                onOpen={id => navigate(`/p/${id}`)}
+            <label className="field">
+              <span>本地路径</span>
+              <input
+                value={localForm.local_path}
+                onChange={event => setLocalForm({ ...localForm, local_path: event.target.value })}
+                placeholder="E:\path\to\project"
+                maxLength={500}
               />
-            ))}
+            </label>
+            <label className="field">
+              <span>分类</span>
+              <select
+                value={localForm.relation}
+                onChange={event => setLocalForm({ ...localForm, relation: event.target.value })}
+              >
+                <option value="ownership">Ownership</option>
+                <option value="contribute">Contribute</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>状态</span>
+              <select
+                value={localForm.status}
+                onChange={event => setLocalForm({ ...localForm, status: event.target.value })}
+              >
+                {STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              <span>优先级</span>
+              <select
+                value={localForm.priority}
+                onChange={event => setLocalForm({ ...localForm, priority: event.target.value })}
+              >
+                {PRIORITIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </label>
           </div>
-        ) : (
-          <div className="section-empty">
-            这个分类下还没有本地项目。{auth.authenticated ? '点“添加本地项目”补一个。' : '登录后可添加。'}
+          <label className="field">
+            <span>描述</span>
+            <textarea
+              value={localForm.description}
+              onChange={event => setLocalForm({ ...localForm, description: event.target.value })}
+              placeholder="这个项目在做什么、现在到哪一步…"
+              rows={3}
+              maxLength={2000}
+            />
+          </label>
+          <div className="form-actions">
+            <button type="submit" className="btn primary" disabled={creating || !localForm.name.trim()}>
+              {creating ? '保存中…' : '保存本地项目'}
+            </button>
+            <button type="button" className="btn ghost" onClick={() => setShowLocalForm(false)}>
+              取消
+            </button>
           </div>
-        )}
-      </section>
+        </form>
+      )}
+
+      {STATUSES.map(status => {
+        const statusProjects = visibleProjects.filter(project => project.status === status.id);
+        const github = statusProjects.filter(project => !isLocal(project));
+        const local = statusProjects.filter(isLocal);
+        return (
+          <section className="status-section" key={status.id}>
+            <div className="status-head">
+              <div>
+                <span className="eyebrow">STATUS</span>
+                <h2>{status.label}</h2>
+                <p className="muted">{status.description}</p>
+              </div>
+              <span className="section-count">{statusProjects.length} 个</span>
+            </div>
+            <div className="status-groups">
+              <div className="source-group">
+                <div className="source-group-head">
+                  <h3>已上传 GitHub</h3>
+                  <span className="count">{github.length}</span>
+                </div>
+                {github.length ? (
+                  <div className="project-grid">{renderProjects(github)}</div>
+                ) : (
+                  <div className="source-empty">暂无已上传项目</div>
+                )}
+              </div>
+              <div className="source-group">
+                <div className="source-group-head">
+                  <h3>未上传 GitHub</h3>
+                  <span className="count">{local.length}</span>
+                </div>
+                {local.length ? (
+                  <div className="project-grid">{renderProjects(local)}</div>
+                ) : (
+                  <div className="source-empty">暂无本地项目</div>
+                )}
+              </div>
+            </div>
+          </section>
+        );
+      })}
 
       <div className="board-foot">
         <span>每 60 秒自动刷新 · {projects.length} 个项目</span>
