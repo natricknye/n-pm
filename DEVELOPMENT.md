@@ -295,3 +295,4 @@ PM_SITE_URL=https://pm.natricknye.cn
 ## 12. 变更记录
 
 - 2026-11-25：创建 N/PM 初版。React/Vite + Vercel Functions + Neon；单用户 scrypt 登录；公开看板/登录编辑；GitHub 仓库自动导入；`ownership` / `contribute` 分类与手动覆盖；webhook（Edge 验签 + 内部 Node）+ 每日 cron + 60 秒前端轮询；任务、笔记、commit diff；6 项单元测试通过。
+- 2026-11-25：公开仓库 `https://github.com/natricknye/n-pm` 已创建并推送；N/PM 品牌、README/DEVELOPMENT、公开/私有边界完成。尚未部署：需要 Neon `DATABASE_URL`、Vercel 项目/环境变量、GitHub PAT 与 webhook secret；Vercel API 网络当前超时。

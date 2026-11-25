@@ -8,7 +8,17 @@
 - GitHub repos are imported automatically and split into **Ownership** (your repos) and **Contribute** (other people's repos / contributions).
 - GitHub webhooks update the board in near real time; a daily cron and a 60-second UI refresh are the fallback.
 
-Live: `https://pm.natricknye.cn` (after deployment)
+Repo: `https://github.com/natricknye/n-pm`
+
+Live: `https://pm.natricknye.cn` — **not deployed yet**; waiting for Neon + Vercel environment variables.
+
+## Status
+
+- [x] N/PM UI, API, auth, GitHub sync code
+- [x] Public repository
+- [ ] Neon database + `DATABASE_URL`
+- [ ] Vercel project + env + `pm.natricknye.cn`
+- [ ] GitHub PAT + webhook secret
 
 ## Stack
 
