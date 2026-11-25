@@ -441,10 +441,10 @@ export async function handle(req, res) {
         if (!id) return json(res, 404, { error: 'not_found' });
         return deleteNote(res, id);
       }
-      if (parts[1] === 'commits' && parts.length === 5 && parts[3] === 'diff' && m === 'GET') {
+      if (parts[1] === 'commits' && parts.length === 5 && parts[4] === 'diff' && m === 'GET') {
         const id = idOf(parts[2]);
         if (!id) return json(res, 404, { error: 'not_found' });
-        return diff(res, id, parts[4]);
+        return diff(res, id, parts[3]);
       }
       if (parts[1] === 'sync' && parts.length === 2) {
         if (m === 'GET') return syncInfo(res);

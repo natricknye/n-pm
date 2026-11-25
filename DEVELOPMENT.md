@@ -10,7 +10,7 @@ N/PM 是一个**单用户**的开发项目看板：
 - GitHub 自动同步：webhook 实时 + 每日 cron 兜底 + 前端 60 秒轮询
 - 项目分两类：`ownership`（自己的仓库）和 `contribute`（别人的仓库/参与贡献）
 
-线上入口：`https://pm.natricknye.cn`（部署后）
+线上入口：`https://pm.natricknye.cn`（Vercel 部署 READY；阿里云 `pm` CNAME 待添加）
 
 ## 2. 架构
 
@@ -57,6 +57,10 @@ server/router.js           API 路由
 sql/schema.sql             表结构
 scripts/migrate.mjs        执行 schema
 scripts/hash-password.mjs  生成 PM_PASSWORD_HASH
+scripts/sync.mjs           CLI 同步 GitHub
+scripts/dev-server.mjs     本地静态 + API router
+scripts/load-env.mjs       读取 .env.local
+scripts/setup-webhooks.ps1 批量配置 GitHub webhook
 src/main.jsx               React 入口（HashRouter）
 src/App.jsx                会话、布局、路由
 src/Board.jsx              公开/管理员看板、拖拽、同步、轮询
@@ -235,6 +239,30 @@ npm run vercel:dev
 npm run dev
 ```
 
+不依赖 Vercel CLI 的本地全栈：
+
+```bash
+npm run build
+npm run local
+# http://127.0.0.1:3001
+```
+
+`scripts/dev-server.mjs` 静态托管 `dist`，并把 `/api/*` 交给同一个 `server/router.js`，数据库仍连 `.env.local` 的 Neon。
+
+CLI 同步：
+
+```bash
+npm run sync
+```
+
+真实环境冒烟（需先启动 `npm run local`）：
+
+```powershell
+$env:PM_TEST_PASSWORD='...'; node smoke-live.cjs
+```
+
+它会验证公开只读、401、登录、9 个项目、私有仓库可见性、任务/笔记增删、commit diff、同步状态和退出登录；测试数据会自动删除。
+
 测试：
 
 ```bash
@@ -242,7 +270,7 @@ npm test
 npm run build
 ```
 
-当前测试：auth 2 项 + GitHub 分类/可见性 4 项 = 6 项。
+当前测试：auth 2 项 + GitHub 分类/可见性 4 项 = 6 项，另有 mock smoke 和 live smoke。
 
 ### Windows 符号链接坑
 
@@ -256,30 +284,69 @@ The "fileName" or "name" properties ... received "E:/.../index.html"
 
 ## 10. 部署
 
-```bash
-vercel
-vercel deploy --prod
+当前生产：
+
+```text
+Vercel project     nate-pm
+Production domain  pm.natricknye.cn
+Deployment         dpl_72rJ6mxAijwTfPjYgNFYhdnfcCwm
+Neon resource      n-pm-db（Vercel Marketplace，Free）
+Neon project       twilight-unit-04685252
 ```
+
+部署命令：
+
+```bash
+npx vercel deploy --prod --yes --archive=tgz
+```
+
+`--archive=tgz` 可以减少上传请求数，网络不稳时更可靠。
 
 Vercel Production 环境变量：
 
 ```text
-DATABASE_URL
+DATABASE_URL          Neon 集成自动注入
 GITHUB_USERNAME=natricknye
-GITHUB_TOKEN
-GITHUB_WEBHOOK_SECRET
-PM_PASSWORD_HASH
-PM_SESSION_SECRET
-CRON_SECRET
+GITHUB_TOKEN          GitHub 读权限
+GITHUB_WEBHOOK_SECRET webhook HMAC
+PM_PASSWORD_HASH      博客同密码，PM 独立 hash
+PM_SESSION_SECRET     独立随机值
+CRON_SECRET           每日 cron
 PM_SITE_URL=https://pm.natricknye.cn
 ```
 
 子域：
 
-1. Vercel → Project → Settings → Domains → Add `pm.natricknye.cn`
-2. 阿里云 DNS 加 Vercel 给的 CNAME（通常 `pm` → `cname.vercel-dns.com`）
-3. 如要求，加 `_vercel` TXT 验证
-4. 不要动根域/`www`；SSL 由 Vercel 自动签发
+1. Vercel 已添加 `pm.natricknye.cn`
+2. 阿里云 DNS 加记录：
+
+```text
+类型: CNAME
+主机: pm
+记录值: 571a54a8621f89cb.vercel-dns-017.com.
+TTL: 10 分钟（默认）
+```
+
+备用值 `cname.vercel-dns.com.`；不要动根域/`www`。加完后 `vercel domains verify pm.natricknye.cn` 应返回 `ok`，SSL 由 Vercel 自动签发。
+
+### 部署保护
+
+`nate-pm` 的 Deployment Protection 是 `all_except_custom_domains`：预览部署需要 Vercel 登录，自定义域名 `pm.natricknye.cn` 公开可读。不要把它改成全站密码保护，否则公开看板会被挡住。
+
+### GitHub webhook
+
+已为 `natricknye` 名下 9 个仓库创建：
+
+```text
+URL:    https://pm.natricknye.cn/api/github/webhook
+Events: push, repository, release, public, fork
+```
+
+重跑/补建：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-webhooks.ps1
+```
 
 ## 11. 已知限制 / 待办
 
@@ -289,10 +356,13 @@ PM_SITE_URL=https://pm.natricknye.cn
 - 单次 sync 最多 80 个仓库、每 repo 首次 10 条 commit
 - Vercel Hobby 的 Cron 频率/函数时长可能受限；webhook 为主
 - 任务/笔记没有软删除/回收站
-- 没有自动化 UI 测试；目前是 build + unit + mock smoke
+- UI 测试是本地脚本（`smoke.cjs` mock、`smoke-live.cjs` 真实数据库），没有接 CI
 - `npm run build` 在 C:/E: 符号链接下需用真实路径
+- 阿里云 `pm` CNAME 未添加前，公网域名和 GitHub webhook 都不通；Vercel 部署本身已 READY
+- 本机网络对 `*.vercel.app` 有 DNS 污染，不能用部署 URL 直接验收；以自定义域名为准
 
 ## 12. 变更记录
 
 - 2026-11-25：创建 N/PM 初版。React/Vite + Vercel Functions + Neon；单用户 scrypt 登录；公开看板/登录编辑；GitHub 仓库自动导入；`ownership` / `contribute` 分类与手动覆盖；webhook（Edge 验签 + 内部 Node）+ 每日 cron + 60 秒前端轮询；任务、笔记、commit diff；6 项单元测试通过。
 - 2026-11-25：公开仓库 `https://github.com/natricknye/n-pm` 已创建并推送；N/PM 品牌、README/DEVELOPMENT、公开/私有边界完成。尚未部署：需要 Neon `DATABASE_URL`、Vercel 项目/环境变量、GitHub PAT 与 webhook secret；Vercel API 网络当前超时。
+- 2026-11-25：完成生产部署。Vercel `nate-pm` + Neon Marketplace `n-pm-db` + schema；9 个仓库、70 条 commit 已同步；9 个仓库 webhook 已建；Production 环境变量齐全。新增 `scripts/load-env.mjs`、`sync.mjs`、`dev-server.mjs`、`setup-webhooks.ps1`；修复 `/api/admin/commits/:id/:sha/diff` 路由下标 bug；真实环境冒烟通过（公开 6 / 登录 9 / diff 866 字符 / 退出 401）。仅剩阿里云 `pm` CNAME。

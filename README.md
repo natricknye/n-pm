@@ -10,15 +10,18 @@
 
 Repo: `https://github.com/natricknye/n-pm`
 
-Live: `https://pm.natricknye.cn` — **not deployed yet**; waiting for Neon + Vercel environment variables.
+Live: `https://pm.natricknye.cn` — Vercel deployment is **READY**; the only remaining step is the Aliyun DNS CNAME.
 
 ## Status
 
 - [x] N/PM UI, API, auth, GitHub sync code
 - [x] Public repository
-- [ ] Neon database + `DATABASE_URL`
-- [ ] Vercel project + env + `pm.natricknye.cn`
-- [ ] GitHub PAT + webhook secret
+- [x] Neon database (`n-pm-db`, Vercel Marketplace) + schema
+- [x] Vercel project `nate-pm` + Production environment variables
+- [x] GitHub token + webhook secret + hooks on all owned repos
+- [ ] Aliyun DNS: `pm` CNAME → `571a54a8621f89cb.vercel-dns-017.com.`
+
+Current production deployment: `dpl_72rJ6mxAijwTfPjYgNFYhdnfcCwm`
 
 ## Stack
 
@@ -103,11 +106,29 @@ Without a token the app only imports public repos and is subject to GitHub's una
 
 ### 4. Run locally
 
+Two options:
+
 ```bash
 npm run vercel:dev
 ```
 
-`vercel dev` serves the Vite app and `/api/*` functions together. `npm run dev` only serves the frontend.
+`vercel dev` serves the Vite app and `/api/*` functions together, but needs a working Vercel API connection.
+
+If the Vercel API is unreachable, build once and use the lightweight local server:
+
+```bash
+npm run build
+npm run local
+# http://127.0.0.1:3001
+```
+
+`npm run local` serves `dist` and calls the same `server/router.js` API against `DATABASE_URL`. `npm run dev` only serves the frontend.
+
+CLI sync against the configured database:
+
+```bash
+npm run sync
+```
 
 ### 5. Deploy
 
@@ -127,7 +148,16 @@ Set these Vercel Production env vars:
 - `CRON_SECRET`
 - `PM_SITE_URL=https://pm.natricknye.cn`
 
-Add the domain `pm.natricknye.cn` in Vercel. At Aliyun DNS add the record Vercel gives you (usually a `CNAME` for `pm` → `cname.vercel-dns.com`, plus a `_vercel` TXT verification if asked). Do not change the root/`www` records. Vercel issues SSL automatically.
+Add the domain `pm.natricknye.cn` in Vercel. At Aliyun DNS add the record Vercel gives you. For this project the exact record is:
+
+```text
+Type:  CNAME
+Host:  pm
+Value: 571a54a8621f89cb.vercel-dns-017.com.
+TTL:   default (10 minutes)
+```
+
+The fallback value is `cname.vercel-dns.com.` Do not change the root/`www` records. Vercel issues SSL automatically.
 
 ## GitHub auto-update
 
@@ -139,8 +169,16 @@ For each repo you want real-time updates on:
 2. Payload URL: `https://pm.natricknye.cn/api/github/webhook`
 3. Content type: `application/json`
 4. Secret: the same value as `GITHUB_WEBHOOK_SECRET`
-5. Events: `push` and `repository` (or "Send me everything")
+5. Events: `push`, `repository`, `release`, `public`, `fork`
 6. Save, then use "Recent Deliveries" → Ping to verify
+
+The automated equivalent for every repo owned by `natricknye`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-webhooks.ps1
+```
+
+It generates a new webhook secret, writes it to Vercel Production, and creates or updates the hook on each owned repo. Requires `gh` and `vercel` to be logged in.
 
 ### Option B — GitHub App (all repos)
 
@@ -228,7 +266,7 @@ server/http.js             JSON body / origin / IP helpers
 server/router.js           API routing
 sql/schema.sql             Postgres schema
 src/                       React app
-scripts/                   migrate + password hash
+scripts/                   migrate, sync, local server, webhook setup
 tests/                     auth + repo classification
 ```
 
@@ -240,6 +278,8 @@ tests/                     auth + repo classification
 - GitHub API rate limits still apply; use a PAT.
 - Private repos are never exposed on the public API. Do not mark a private repo visible and expect it to appear; the server filters `is_private`.
 - The frontend polls every 60 seconds. Real-time webhook delivery depends on GitHub reaching the deployment.
+- Until the `pm` CNAME exists, GitHub webhook deliveries fail and the public domain does not resolve. The deployment itself is already healthy.
+- Current database snapshot: 9 synced repos (6 public ownership, 1 private ownership, 2 public forks), 70 commits; forks/private repos are hidden from the public board.
 
 ## Windows note
 
