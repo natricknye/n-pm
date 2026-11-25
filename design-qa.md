@@ -62,6 +62,7 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 
 ### 线上验证
 
+- 生产部署：`dpl_4Y96a1vzuPG3etu81WJvoNBuczeF`
 - 公开看板：9 个（7 Ownership + 2 Contribute），两个来源分区正常。
 - 登录后：10 个（含私有 JIAO 和本地 math-paper）。
 - 本地项目详情：显示“本地项目”和本地路径，隐藏 Commits 标签。
