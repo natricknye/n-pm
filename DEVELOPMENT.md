@@ -10,7 +10,7 @@ N/PM 是一个**单用户**的开发项目看板：
 - GitHub 自动同步：webhook 实时 + 每日 cron 兜底 + 前端 60 秒轮询
 - 项目分两类：`ownership`（自己的仓库）和 `contribute`（别人的仓库/参与贡献）
 
-线上入口：`https://pm.natricknye.cn`（Vercel 部署 READY；阿里云 `pm` CNAME 待添加）
+线上入口：`https://pm.natricknye.cn`（已部署，HTTPS 正常，阿里云 CNAME 已生效）
 
 ## 2. 架构
 
@@ -63,7 +63,7 @@ scripts/load-env.mjs       读取 .env.local
 scripts/setup-webhooks.ps1 批量配置 GitHub webhook
 src/main.jsx               React 入口（HashRouter）
 src/App.jsx                会话、布局、路由
-src/Board.jsx              公开/管理员看板、拖拽、同步、轮询
+src/Board.jsx              白亮看板、GitHub/本地分区、本地项目表单、轮询
 src/ProjectPage.jsx        详情、任务、笔记、commits/diff
 src/Login.jsx              单用户登录
 src/auth-context.jsx       AuthContext
@@ -88,7 +88,10 @@ tests/github.test.mjs      ownership/contribute/可见性
 | `status` | `planning` / `active` / `paused` / `done` |
 | `priority` | `low` / `medium` / `high` |
 | `visible` | 公开看板是否可见；私有仓库仍被 `is_private` 过滤 |
+| `local_path` | 本地项目路径；只在管理员 API 返回，公开 API 不返回 |
 | `last_commit_at` / `last_synced_at` | 展示与增量同步 |
+
+`github_id is null` 表示本地项目；API 返回派生字段 `source = 'github' | 'local'`。本地项目不参与 GitHub sync。
 
 ### tasks / notes / commits
 
@@ -125,7 +128,7 @@ owner.login === username     → ownership
 其他                          → contribute
 ```
 
-手动在 UI 改分类会写 `relation_source='manual'`；后续 sync 不会覆盖。Fork 默认 `contribute`，公开看板默认隐藏 fork。
+手动在 UI 改分类会写 `relation_source='manual'`；后续 sync 不会覆盖。Fork 默认 `contribute`，且公开看板默认可见；私有/archived 仍隐藏。
 
 ### 状态
 
@@ -141,10 +144,10 @@ owner.login === username     → ownership
 新仓库：
 
 ```text
-visible = !private && !fork && !archived
+visible = !private && !archived
 ```
 
-已有仓库：public/private 变化时，private/archived 强制 `visible=false`；public 不会自动恢复，管理员可在详情页打开。`repository publicized` webhook 会自动打开非 fork/非 archived 的仓库。
+已有仓库：public/private 变化时，private/archived 强制 `visible=false`；public 不会自动恢复，管理员可在详情页打开。`repository publicized` webhook 会自动打开非 archived 的仓库。
 
 ### commits
 
@@ -183,9 +186,10 @@ Vercel 发送 `Authorization: Bearer $CRON_SECRET`；`cronSync` 校验后执行 
 公开：
 
 - `/api/projects`、`/api/projects/:id`
-- 只返回 `visible=true && is_private=false && is_deleted=false && is_fork=false`
-- 字段只有摘要；不含 commit、tasks、notes、owner_login
+- 只返回 `visible=true && is_private=false && is_deleted=false`
+- 字段只有摘要；不含 commit、tasks、notes、owner_login、local_path
 - 私有仓库即使 `visible=true` 也不会出现
+- fork 可以公开，但只在管理员允许 `visible=true` 时出现
 
 需要登录：
 
@@ -220,7 +224,7 @@ npm run hash-password
 见 `README.md` 的 API 表。路由实现在 `server/router.js`：
 
 - 公开：`session`、`login`、`logout`、`projects`、`projects/:id`
-- 管理：`admin/projects`、`admin/projects/:id`、`admin/projects/:id/{tasks,notes,commits}`、`admin/tasks/:id`、`admin/notes/:id`、`admin/commits/:id/:sha/diff`、`admin/sync`
+- 管理：`admin/projects`（GET/POST）、`admin/projects/:id`（GET/PATCH/DELETE，DELETE 仅本地项目）、`admin/projects/:id/{tasks,notes,commits}`、`admin/tasks/:id`、`admin/notes/:id`、`admin/commits/:id/:sha/diff`、`admin/sync`
 - 运维：`cron/sync`、`github/webhook`、`internal/github-webhook`
 
 ## 9. 本地开发 / 测试
@@ -249,11 +253,14 @@ npm run local
 
 `scripts/dev-server.mjs` 静态托管 `dist`，并把 `/api/*` 交给同一个 `server/router.js`，数据库仍连 `.env.local` 的 Neon。
 
-CLI 同步：
+CLI 同步和本地项目种子：
 
 ```bash
 npm run sync
+npm run seed:local
 ```
+
+`seed:local` 会 upsert `math-paper` 等本地项目，并把 Dela/opencode 设为可见 Contribute。
 
 真实环境冒烟（需先启动 `npm run local`）：
 
@@ -261,7 +268,11 @@ npm run sync
 $env:PM_TEST_PASSWORD='...'; node smoke-live.cjs
 ```
 
-它会验证公开只读、401、登录、9 个项目、私有仓库可见性、任务/笔记增删、commit diff、同步状态和退出登录；测试数据会自动删除。
+它会验证公开 9 个/登录 10 个、GitHub/本地两个分区、Contribute 可见、本地项目详情、本地项目表单创建/删除、任务/笔记增删、commit diff、同步状态和退出登录；测试数据会自动删除。失败残留可用：
+
+```bash
+npm run clean:smoke
+```
 
 测试：
 
@@ -289,7 +300,7 @@ The "fileName" or "name" properties ... received "E:/.../index.html"
 ```text
 Vercel project     nate-pm
 Production domain  pm.natricknye.cn
-Deployment         dpl_72rJ6mxAijwTfPjYgNFYhdnfcCwm
+Deployment         dpl_76zVyZciEBVSxaYZrTLKj8pLNkxz
 Neon resource      n-pm-db（Vercel Marketplace，Free）
 Neon project       twilight-unit-04685252
 ```
@@ -301,6 +312,19 @@ npx vercel deploy --prod --yes --archive=tgz
 ```
 
 `--archive=tgz` 可以减少上传请求数，网络不稳时更可靠。
+
+### 嵌套 API 路由的坑
+
+Vercel 对非 Next 项目里的 `api/[...route].js` 只匹配一层 `/api/*`，`/api/projects/1`、`/api/admin/projects` 这类二级路径会直接返回 Vercel 的 `NOT_FOUND`（`text/plain`）。`vercel.json` 里加了一条 rewrite：
+
+```json
+{
+  "source": "/api/(.*)",
+  "destination": "/api/[...route]"
+}
+```
+
+`/api/github/webhook` 是文件系统里真实存在的 Edge Function，优先级高于 rewrite，仍然由 Edge 验签。验证方法：`/api/admin/projects` 未登录应返回 JSON 401，而不是 Vercel 的纯文本 404。
 
 Vercel Production 环境变量：
 
@@ -327,7 +351,7 @@ PM_SITE_URL=https://pm.natricknye.cn
 TTL: 10 分钟（默认）
 ```
 
-备用值 `cname.vercel-dns.com.`；不要动根域/`www`。加完后 `vercel domains verify pm.natricknye.cn` 应返回 `ok`，SSL 由 Vercel 自动签发。
+备用值 `cname.vercel-dns.com.`；不要动根域/`www`。当前记录已生效，`pm.natricknye.cn` 解析到 Vercel 边缘 IP，HTTPS 正常（本机直连可能被 TLS 干扰，可用代理验收）。
 
 ### 部署保护
 
@@ -358,11 +382,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-webhooks.ps1
 - 任务/笔记没有软删除/回收站
 - UI 测试是本地脚本（`smoke.cjs` mock、`smoke-live.cjs` 真实数据库），没有接 CI
 - `npm run build` 在 C:/E: 符号链接下需用真实路径
-- 阿里云 `pm` CNAME 未添加前，公网域名和 GitHub webhook 都不通；Vercel 部署本身已 READY
-- 本机网络对 `*.vercel.app` 有 DNS 污染，不能用部署 URL 直接验收；以自定义域名为准
+- 本机网络对 `*.vercel.app` 有 DNS 污染、对部分 Vercel TLS 直连会被干扰；用自定义域名和代理验收
+- 本地项目删除是硬删除，任务/笔记会一起删；没有回收站
+- 当前公开看板 9 个（7 Ownership + 2 Contribute），管理员 10 个（含私有 JIAO）
 
 ## 12. 变更记录
 
 - 2026-11-25：创建 N/PM 初版。React/Vite + Vercel Functions + Neon；单用户 scrypt 登录；公开看板/登录编辑；GitHub 仓库自动导入；`ownership` / `contribute` 分类与手动覆盖；webhook（Edge 验签 + 内部 Node）+ 每日 cron + 60 秒前端轮询；任务、笔记、commit diff；6 项单元测试通过。
 - 2026-11-25：公开仓库 `https://github.com/natricknye/n-pm` 已创建并推送；N/PM 品牌、README/DEVELOPMENT、公开/私有边界完成。尚未部署：需要 Neon `DATABASE_URL`、Vercel 项目/环境变量、GitHub PAT 与 webhook secret；Vercel API 网络当前超时。
 - 2026-11-25：完成生产部署。Vercel `nate-pm` + Neon Marketplace `n-pm-db` + schema；9 个仓库、70 条 commit 已同步；9 个仓库 webhook 已建；Production 环境变量齐全。新增 `scripts/load-env.mjs`、`sync.mjs`、`dev-server.mjs`、`setup-webhooks.ps1`；修复 `/api/admin/commits/:id/:sha/diff` 路由下标 bug；真实环境冒烟通过（公开 6 / 登录 9 / diff 866 字符 / 退出 401）。仅剩阿里云 `pm` CNAME。
+- 2026-11-25：阿里云 CNAME 已添加并生效，HTTPS 正常。前端改为白亮主题；看板按“已上传 GitHub / 未上传 GitHub”分区，项目卡片在主区直接点开；新增本地项目创建/删除和 `local_path`；Dela/opencode 作为可见 Contribute；新增 `seed:local`、`clean:smoke`、favicon 和 Vercel 嵌套 API rewrite。线上冒烟通过：公开 9、登录 10、本地表单创建/删除、Contribute 2、diff 866 字符。

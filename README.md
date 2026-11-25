@@ -10,7 +10,7 @@
 
 Repo: `https://github.com/natricknye/n-pm`
 
-Live: `https://pm.natricknye.cn` — Vercel deployment is **READY**; the only remaining step is the Aliyun DNS CNAME.
+Live: `https://pm.natricknye.cn` — deployed and serving over HTTPS.
 
 ## Status
 
@@ -19,9 +19,10 @@ Live: `https://pm.natricknye.cn` — Vercel deployment is **READY**; the only re
 - [x] Neon database (`n-pm-db`, Vercel Marketplace) + schema
 - [x] Vercel project `nate-pm` + Production environment variables
 - [x] GitHub token + webhook secret + hooks on all owned repos
-- [ ] Aliyun DNS: `pm` CNAME → `571a54a8621f89cb.vercel-dns-017.com.`
+- [x] Aliyun DNS: `pm` CNAME → `571a54a8621f89cb.vercel-dns-017.com.`
+- [x] Light theme + GitHub/local project sections + Contribute visibility
 
-Current production deployment: `dpl_72rJ6mxAijwTfPjYgNFYhdnfcCwm`
+Current production deployment: `dpl_76zVyZciEBVSxaYZrTLKj8pLNkxz`
 
 ## Stack
 
@@ -41,13 +42,16 @@ Why this shape:
 
 ## Features
 
-- Project board grouped by `planning / active / paused / done`
+- Light, white-first UI
+- Project board split into **Uploaded to GitHub** and **Not uploaded to GitHub**
+- Project cards live on the main board; click any card to open the detail page
 - Ownership / Contribute tabs and per-project override
-- Drag project cards to change status
+- Change status from the card (login required) or the detail page
+- Manual local projects: name, path, description, relation, status, priority
 - Tasks (`todo / doing / done`) per project
 - Markdown notes per project
 - Commit list and on-demand diff, login only
-- Public board hides private, fork, archived and deleted repos
+- Public board hides private, archived and deleted repos; public forks can be shown
 - GitHub sync:
   - manual "Sync GitHub" button
   - webhook on `push` / `repository` events
@@ -202,7 +206,9 @@ The app only receives events; N/PM still uses the fine-grained PAT for reading r
 - `ownership` — repo owner is `GITHUB_USERNAME`
 - `contribute` — repo owner is someone else, or the repo is a fork
 
-On sync, new rows are classified automatically. Changing the relation in the UI sets `relation_source = 'manual'`; later syncs will not overwrite it. A fork is classified as `contribute` by default.
+On sync, new rows are classified automatically. Changing the relation in the UI sets `relation_source = 'manual'`; later syncs will not overwrite it. A fork is classified as `contribute` by default and is visible on the public board unless it is private, archived or manually hidden.
+
+Local projects (`github_id is null`) are always `relation_source = 'manual'` and never touched by GitHub sync.
 
 ## Public vs private
 
@@ -212,12 +218,11 @@ Public `GET /api/projects` only returns rows that are:
 visible = true
 is_private = false
 is_deleted = false
-is_fork = false
 ```
 
-It returns summaries only: name, description, language, stars, forks, relation, status, priority, last commit time. It never returns commit messages, diffs, tasks, notes, owner login, or private repo names.
+It returns summaries only: name, description, language, stars, forks, relation, status, priority, last commit time, and a derived `source` (`github` / `local`). It never returns commit messages, diffs, tasks, notes, owner login, local filesystem paths, or private repo names.
 
-Logged-in `GET /api/admin/projects` returns all rows, including private repos. The public page still hides private repos even if `visible` is true.
+Logged-in `GET /api/admin/projects` returns all rows, including private repos and local paths. The public page still hides private repos even if `visible` is true.
 
 ## Auth
 
@@ -238,8 +243,10 @@ Logged-in `GET /api/admin/projects` returns all rows, including private repos. T
 | GET | `/api/projects` | no | public project summaries |
 | GET | `/api/projects/:id` | no | public project summary |
 | GET | `/api/admin/projects` | yes | all projects |
+| POST | `/api/admin/projects` | yes | create a local project |
 | GET | `/api/admin/projects/:id` | yes | project detail |
-| PATCH | `/api/admin/projects/:id` | yes | status / priority / relation / visible |
+| PATCH | `/api/admin/projects/:id` | yes | status / priority / relation / visible / local fields |
+| DELETE | `/api/admin/projects/:id` | yes | delete a local project |
 | GET | `/api/admin/projects/:id/tasks` | yes | tasks |
 | POST | `/api/admin/projects/:id/tasks` | yes | create task |
 | PATCH | `/api/admin/tasks/:id` | yes | update task |
@@ -266,7 +273,8 @@ server/http.js             JSON body / origin / IP helpers
 server/router.js           API routing
 sql/schema.sql             Postgres schema
 src/                       React app
-scripts/                   migrate, sync, local server, webhook setup
+scripts/                   migrate, sync, seed local projects, local server, webhook setup
+public/                    favicon
 tests/                     auth + repo classification
 ```
 
@@ -277,9 +285,10 @@ tests/                     auth + repo classification
 - Diffs are fetched on demand from GitHub and capped at 1.5 MB.
 - GitHub API rate limits still apply; use a PAT.
 - Private repos are never exposed on the public API. Do not mark a private repo visible and expect it to appear; the server filters `is_private`.
+- Public forks are visible by default now. Hide one from its detail page if you do not want it on the public board.
+- Local projects have no GitHub commits. Their detail page only shows overview, tasks and notes.
 - The frontend polls every 60 seconds. Real-time webhook delivery depends on GitHub reaching the deployment.
-- Until the `pm` CNAME exists, GitHub webhook deliveries fail and the public domain does not resolve. The deployment itself is already healthy.
-- Current database snapshot: 9 synced repos (6 public ownership, 1 private ownership, 2 public forks), 70 commits; forks/private repos are hidden from the public board.
+- Current database snapshot: 10 projects (8 public GitHub, 1 private GitHub, 1 local `math-paper`), 70 commits; public board shows 9 (7 ownership + 2 contribute).
 
 ## Windows note
 

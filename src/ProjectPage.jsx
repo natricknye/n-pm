@@ -85,8 +85,12 @@ export default function ProjectPage() {
     if (!auth.authenticated) return;
     if (tab === 'tasks') loadTasks();
     if (tab === 'notes') loadNotes();
-    if (tab === 'commits') loadCommits();
+    if (tab === 'commits' && project?.source !== 'local') loadCommits();
   }, [tab, auth.authenticated, id]);
+
+  useEffect(() => {
+    if (project?.source === 'local' && tab === 'commits') setTab('overview');
+  }, [project?.source, tab]);
 
   const patch = async payload => {
     setSaving(true);
@@ -97,6 +101,20 @@ export default function ProjectPage() {
         body: JSON.stringify(payload),
       });
       setProject(previous => ({ ...previous, ...data.project }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeProject = async () => {
+    if (!window.confirm(`删除本地项目“${project.name}”？任务和笔记也会一起删除。`)) return;
+    setSaving(true);
+    setError('');
+    try {
+      await api(`/api/admin/projects/${id}`, { method: 'DELETE' });
+      navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -195,6 +213,8 @@ export default function ProjectPage() {
     );
   }
 
+  const tabs = project.source === 'local' ? TABS.filter(item => item.id !== 'commits') : TABS;
+
   return (
     <section className="project-page">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
@@ -208,6 +228,7 @@ export default function ProjectPage() {
               {relationLabel[project.relation] || project.relation}
             </span>
             <span className="tag">{statusLabel[project.status] || project.status}</span>
+            <span className="tag source">{project.source === 'local' ? '本地项目' : 'GitHub'}</span>
             {project.is_private && <span className="tag private">Private</span>}
             {project.is_fork && <span className="tag">Fork</span>}
           </div>
@@ -215,10 +236,16 @@ export default function ProjectPage() {
           {project.description && <p className="project-desc">{project.description}</p>}
           <div className="project-meta">
             {project.language && <span>{project.language}</span>}
-            <span>★ {project.stars}</span>
-            <span>Fork {project.forks}</span>
-            <span>最后 commit {formatDate(project.last_commit_at)}</span>
-            {auth.authenticated && <span>同步 {timeAgo(project.last_synced_at)}</span>}
+            {project.source !== 'local' && <span>★ {project.stars}</span>}
+            {project.source !== 'local' && <span>Fork {project.forks}</span>}
+            <span>
+              {project.source === 'local'
+                ? '未上传 GitHub'
+                : `最后 commit ${formatDate(project.last_commit_at)}`}
+            </span>
+            {auth.authenticated && project.source !== 'local' && (
+              <span>同步 {timeAgo(project.last_synced_at)}</span>
+            )}
           </div>
           <div className="project-links">
             {project.html_url && (
@@ -281,21 +308,27 @@ export default function ProjectPage() {
               <input
                 type="checkbox"
                 checked={Boolean(project.visible)}
-                disabled={saving || project.is_private || project.is_archived || project.is_fork}
+                disabled={saving || project.is_private || project.is_archived}
                 onChange={event => patch({ visible: event.target.checked })}
               />
               公开看板可见
             </label>
+            {project.source === 'local' && (
+              <button type="button" className="btn danger" onClick={removeProject} disabled={saving}>
+                删除本地项目
+              </button>
+            )}
           </div>
           <p className="small muted">
             GitHub 同步会自动更新仓库信息；分类默认按“仓库 owner 是否是你”判断，手动改过之后不再被覆盖。
+            本地项目不会同步，删除后任务和笔记也会一起移除。
           </p>
         </div>
       )}
 
       {auth.authenticated && (
         <div className="tabs">
-          {TABS.map(item => (
+          {tabs.map(item => (
             <button
               key={item.id}
               type="button"
@@ -321,17 +354,26 @@ export default function ProjectPage() {
               <div><dt>分类</dt><dd>{relationLabel[project.relation]}</dd></div>
               <div><dt>状态</dt><dd>{statusLabel[project.status]}</dd></div>
               <div><dt>优先级</dt><dd>{priorityLabel[project.priority]}</dd></div>
-              <div><dt>最近 commit</dt><dd>{formatDate(project.last_commit_at)}</dd></div>
-              {auth.authenticated && <div><dt>Commit 数</dt><dd>{project.commit_count}</dd></div>}
+              {project.source === 'local' ? (
+                <div><dt>来源</dt><dd>本地项目</dd></div>
+              ) : (
+                <div><dt>最近 commit</dt><dd>{formatDate(project.last_commit_at)}</dd></div>
+              )}
+              {auth.authenticated && project.commit_count > 0 && (
+                <div><dt>Commit 数</dt><dd>{project.commit_count}</dd></div>
+              )}
               {auth.authenticated && <div><dt>未完成任务</dt><dd>{project.open_tasks}</dd></div>}
+              {auth.authenticated && project.local_path && (
+                <div className="wide"><dt>本地路径</dt><dd className="path">{project.local_path}</dd></div>
+              )}
             </dl>
           </div>
           <div className="panel">
             <h2>怎么用</h2>
             <ul className="plain-list">
-              <li>拖卡片改状态（登录后）</li>
+              <li>在卡片或详情页改状态（登录后）</li>
               <li>任务、笔记、commit diff 只对登录可见</li>
-              <li>GitHub push 后 webhook 自动同步；页面每 60 秒刷新</li>
+              <li>GitHub 仓库 push 后 webhook 自动同步；本地项目手动维护</li>
               <li>私有仓库不会出现在公开看板</li>
             </ul>
           </div>

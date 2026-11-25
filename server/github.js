@@ -58,7 +58,7 @@ export function mapRepo(repo) {
     relation_source: 'auto',
     status: active ? 'active' : 'paused',
     priority: 'medium',
-    visible: !repo.private && !repo.fork && !repo.archived,
+    visible: !repo.private && !repo.archived,
     last_commit_at: repo.pushed_at || null,
   };
 }

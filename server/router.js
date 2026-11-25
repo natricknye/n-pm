@@ -10,9 +10,11 @@ import { clientIp, json, method, readJson, readRaw, sameOrigin } from './http.js
 import { getCommitDiff, handleWebhook, handleWebhookPayload, syncGithub } from './github.js';
 
 const PUBLIC_FIELDS = `id, name, full_name, description, html_url, homepage, language,
-  stars, forks, relation, status, priority, last_commit_at, updated_at`;
+  stars, forks, relation, status, priority, last_commit_at, updated_at,
+  case when github_id is null then 'local' else 'github' end as source`;
 const ADMIN_FIELDS = `${PUBLIC_FIELDS}, owner_login, open_issues, is_private, is_fork,
-  is_archived, is_deleted, relation_source, visible, sort_order, last_synced_at, created_at`;
+  is_archived, is_deleted, relation_source, visible, sort_order, last_synced_at, created_at,
+  local_path`;
 
 const STATUSES = new Set(['planning', 'active', 'paused', 'done']);
 const PRIORITIES = new Set(['low', 'medium', 'high']);
@@ -52,6 +54,14 @@ function cleanText(value, max) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
 async function login(req, res) {
   if (!guardWrite(req, res)) return;
   if (!authConfigured()) return json(res, 503, { error: 'not_configured' });
@@ -88,7 +98,7 @@ async function publicProjects(res) {
   const rows = await query(
     `select ${PUBLIC_FIELDS}
      from projects
-     where visible = true and is_private = false and is_deleted = false and is_fork = false
+     where visible = true and is_private = false and is_deleted = false
      order by relation,
        case status when 'active' then 1 when 'planning' then 2 when 'paused' then 3 else 4 end,
        last_commit_at desc nulls last, name`
@@ -101,7 +111,7 @@ async function publicProject(res, id) {
     `select ${PUBLIC_FIELDS},
        (select count(*)::int from commits c where c.project_id = projects.id) as commit_count
      from projects
-     where id = $1 and visible = true and is_private = false and is_deleted = false and is_fork = false`,
+     where id = $1 and visible = true and is_private = false and is_deleted = false`,
     [id]
   );
   if (!rows[0]) return json(res, 404, { error: 'not_found' });
@@ -169,6 +179,13 @@ async function patchProject(req, res, id) {
     if (!Number.isInteger(order)) return json(res, 400, { error: 'sort_order' });
     add('sort_order', order);
   }
+  if (body.name !== undefined) {
+    const name = cleanText(body.name, 120);
+    if (!name) return json(res, 400, { error: 'name' });
+    add('name', name);
+  }
+  if (body.description !== undefined) add('description', cleanText(body.description, 2000));
+  if (body.local_path !== undefined) add('local_path', cleanText(body.local_path, 500));
   if (!fields.length) return json(res, 400, { error: 'empty' });
   values.push(id);
   const rows = await query(
@@ -178,6 +195,45 @@ async function patchProject(req, res, id) {
   );
   if (!rows[0]) return json(res, 404, { error: 'not_found' });
   json(res, 200, { project: rows[0] });
+}
+
+async function createLocalProject(req, res) {
+  if (!guardWrite(req, res)) return;
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    return json(res, 400, { error: 'body' });
+  }
+  const name = cleanText(body.name, 120);
+  if (!name) return json(res, 400, { error: 'name' });
+  const description = cleanText(body.description, 2000);
+  const localPath = cleanText(body.local_path, 500);
+  const relation = RELATIONS.has(body.relation) ? body.relation : 'ownership';
+  const status = STATUSES.has(body.status) ? body.status : 'active';
+  const priority = PRIORITIES.has(body.priority) ? body.priority : 'medium';
+  const fullName = `local/${slugify(name) || 'project'}-${Date.now().toString(36)}`;
+  const rows = await query(
+    `insert into projects (
+       github_id, full_name, owner_login, name, description, html_url, homepage,
+       language, stars, forks, open_issues, is_private, is_fork, is_archived,
+       is_deleted, relation, relation_source, status, priority, visible, local_path
+     ) values (
+       null,$1,null,$2,$3,'','','',0,0,0,false,false,false,false,$4,'manual',$5,$6,true,$7
+     ) returning ${ADMIN_FIELDS}`,
+    [fullName, name, description, relation, status, priority, localPath]
+  );
+  json(res, 201, { project: rows[0] });
+}
+
+async function deleteLocalProject(req, res, id) {
+  if (!guardWrite(req, res)) return;
+  const rows = await query(
+    'delete from projects where id = $1 and github_id is null returning id',
+    [id]
+  );
+  if (!rows[0]) return json(res, 404, { error: 'not_found' });
+  json(res, 200, { ok: true });
 }
 
 async function tasks(req, res, projectId) {
@@ -416,12 +472,16 @@ export async function handle(req, res) {
 
     if (parts[0] === 'admin') {
       if (!requireAuth(req, res)) return;
-      if (parts[1] === 'projects' && parts.length === 2 && m === 'GET') return adminProjects(res);
+      if (parts[1] === 'projects' && parts.length === 2) {
+        if (m === 'GET') return adminProjects(res);
+        if (m === 'POST') return createLocalProject(req, res);
+      }
       if (parts[1] === 'projects' && parts.length === 3) {
         const id = idOf(parts[2]);
         if (!id) return json(res, 404, { error: 'not_found' });
         if (m === 'GET') return adminProject(res, id);
         if (m === 'PATCH') return patchProject(req, res, id);
+        if (m === 'DELETE') return deleteLocalProject(req, res, id);
       }
       if (parts[1] === 'projects' && parts.length === 4) {
         const id = idOf(parts[2]);

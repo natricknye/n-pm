@@ -38,10 +38,10 @@ test('someone else repo is contribute', () => {
   assert.equal(mapped.visible, true);
 });
 
-test('fork is contribute and hidden by default', () => {
+test('fork is contribute and visible unless private or archived', () => {
   const mapped = mapRepo(repo({ id: 3, fork: true }));
   assert.equal(mapped.relation, 'contribute');
-  assert.equal(mapped.visible, false);
+  assert.equal(mapped.visible, true);
 });
 
 test('private and archived repos are hidden; old repos are paused', () => {

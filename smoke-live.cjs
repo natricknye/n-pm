@@ -24,6 +24,7 @@ if (!password) {
   let projectId = null;
   let taskId = null;
   let noteId = null;
+  let tempProjectId = null;
 
   try {
     await page.goto(`${base}/#/`, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -31,10 +32,12 @@ if (!password) {
     console.log('public', JSON.stringify(await page.evaluate(() => ({
       title: document.title,
       cards: document.querySelectorAll('.project-card').length,
+      sections: [...document.querySelectorAll('.source-section h2')].map(item => item.innerText),
       tabs: [...document.querySelectorAll('.relation-tab')].map(item => item.innerText),
       privateTags: document.querySelectorAll('.tag.private').length,
       hasPrivateRepo: document.body.innerText.includes('JIAO'),
       hasFork: document.body.innerText.includes('Dela') || document.body.innerText.includes('opencode'),
+      hasLocalProject: document.body.innerText.includes('math-paper'),
     }))));
 
     const unauthorized = await page.request.get(`${base}/api/admin/projects`);
@@ -71,7 +74,45 @@ if (!password) {
       project: project.full_name,
       relation: project.relation,
       privateHidden: (projectsBody.projects || []).some(item => item.full_name === 'natricknye/JIAO' && item.is_private),
+      contributeVisible: (projectsBody.projects || []).some(item => item.full_name === 'natricknye/Dela' && item.visible),
+      localVisible: (projectsBody.projects || []).some(item => item.full_name === 'local/math-paper' && item.source === 'local'),
     }));
+
+    const localProject = (projectsBody.projects || []).find(item => item.full_name === 'local/math-paper');
+    if (localProject) {
+      await page.goto(`${base}/#/p/${localProject.id}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.project-head h1', { timeout: 30000 });
+      console.log('local-project', JSON.stringify(await page.evaluate(() => ({
+        h1: document.querySelector('.project-head h1')?.innerText,
+        tabs: [...document.querySelectorAll('.tab')].map(item => item.innerText),
+        sourceTag: [...document.querySelectorAll('.tag')].map(item => item.innerText).find(item => item === '本地项目'),
+        localPath: document.querySelector('.facts dd.path')?.innerText || '',
+      }))));
+    }
+
+    const localName = `smoke-ui-${stamp}`;
+    await page.goto(`${base}/#/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.project-card', { timeout: 30000 });
+    await page.getByRole('button', { name: '添加本地项目' }).click();
+    const form = page.locator('.local-form');
+    await form.locator('input').nth(0).fill(localName);
+    await form.locator('input').nth(1).fill(`E:/tmp/${localName}`);
+    await form.locator('textarea').fill('temporary ui form project');
+    await form.getByRole('button', { name: '保存本地项目' }).click();
+    await page.locator('.project-card', { hasText: localName }).waitFor({ timeout: 15000 });
+    const formProjects = await (await page.request.get(`${base}/api/admin/projects`)).json();
+    const formProject = (formProjects.projects || []).find(item => item.name === localName);
+    tempProjectId = formProject?.id;
+    console.log('local-form', JSON.stringify({
+      created: Boolean(tempProjectId),
+      source: formProject?.source,
+      localPath: formProject?.local_path,
+      visible: formProject?.visible,
+    }));
+    if (!tempProjectId) throw new Error('local project form creation failed');
+    const deleteLocal = await page.request.delete(`${base}/api/admin/projects/${tempProjectId}`);
+    console.log('local-delete', JSON.stringify({ status: deleteLocal.status() }));
+    if (deleteLocal.status() === 200) tempProjectId = null;
 
     await page.goto(`${base}/#/p/${projectId}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.admin-panel', { timeout: 30000 });
@@ -132,10 +173,20 @@ if (!password) {
       commits: syncBody.sync?.commits,
     }));
 
+    if (taskId) {
+      await page.request.delete(`${base}/api/admin/tasks/${taskId}`);
+      taskId = null;
+    }
+    if (noteId) {
+      await page.request.delete(`${base}/api/admin/notes/${noteId}`);
+      noteId = null;
+    }
+
     const logout = await page.request.post(`${base}/api/logout`, { data: {} });
     const afterLogout = await page.request.get(`${base}/api/admin/projects`);
     console.log('logout', JSON.stringify({ status: logout.status(), adminAfter: afterLogout.status() }));
   } finally {
+    if (tempProjectId) await page.request.delete(`${base}/api/admin/projects/${tempProjectId}`).catch(() => {});
     if (projectId) {
       if (taskId) await page.request.delete(`${base}/api/admin/tasks/${taskId}`).catch(() => {});
       if (noteId) await page.request.delete(`${base}/api/admin/notes/${noteId}`).catch(() => {});

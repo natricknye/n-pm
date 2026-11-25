@@ -36,6 +36,8 @@ create index if not exists projects_public_idx
 create index if not exists projects_last_commit_idx
   on projects (last_commit_at desc);
 
+alter table projects add column if not exists local_path text;
+
 create table if not exists tasks (
   id bigserial primary key,
   project_id bigint not null references projects(id) on delete cascade,

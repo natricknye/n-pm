@@ -13,6 +13,8 @@
     "vercel:dev": "vercel dev",
     "local": "node scripts/dev-server.mjs",
     "db:migrate": "node scripts/migrate.mjs",
+    "seed:local": "node scripts/seed-local.mjs",
+    "clean:smoke": "node scripts/cleanup-smoke.mjs",
     "sync": "node scripts/sync.mjs",
     "hash-password": "node scripts/hash-password.mjs",
     "test": "node --test tests/*.test.mjs"
