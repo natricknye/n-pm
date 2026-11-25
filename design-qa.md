@@ -62,12 +62,13 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 
 ### 线上验证
 
-- 生产部署：`dpl_4Y96a1vzuPG3etu81WJvoNBuczeF`
+- 生产部署：`dpl_Ar8LvSJ8AqVjVwKCrbpzBKhgLXGx`
 - 公开看板：9 个（7 Ownership + 2 Contribute），两个来源分区正常。
 - 登录后：10 个（含私有 JIAO 和本地 math-paper）。
 - 本地项目详情：显示“本地项目”和本地路径，隐藏 Commits 标签。
 - 本地项目表单：UI 创建 → 列表出现 → API 删除成功。
 - 任务/笔记/commit diff/同步状态/退出 401 全部通过。
+- GitHub push webhook 修复：`pushed_at` 统一转 ISO；重投真实 push 投递返回 200，n-pm 的 `last_commit_at` 自动更新。
 - `npm test`：7/7；`npm run build`：通过。
 
 ### 还没做
