@@ -35,8 +35,16 @@ function repoRelation(repo) {
   return owner === username ? 'ownership' : 'contribute';
 }
 
+function toIso(value) {
+  if (!value) return null;
+  const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export function mapRepo(repo) {
-  const pushed = repo.pushed_at ? new Date(repo.pushed_at) : null;
+  const pushed = repo.pushed_at ? new Date(
+    typeof repo.pushed_at === 'number' ? repo.pushed_at * 1000 : repo.pushed_at
+  ) : null;
   const active = pushed ? Date.now() - pushed.getTime() < ACTIVE_DAYS * 24 * 60 * 60 * 1000 : false;
   return {
     github_id: repo.id,
@@ -59,7 +67,7 @@ export function mapRepo(repo) {
     status: active ? 'active' : 'paused',
     priority: 'medium',
     visible: !repo.private && !repo.archived,
-    last_commit_at: repo.pushed_at || null,
+    last_commit_at: toIso(repo.pushed_at),
   };
 }
 
@@ -279,7 +287,7 @@ export async function handleWebhookPayload(payload, event) {
       `update projects set last_synced_at = now(),
          last_commit_at = greatest(last_commit_at, $2::timestamptz), updated_at = now()
        where id = $1`,
-      [project.id, commits[0]?.committed_at || repo.pushed_at || null]
+      [project.id, commits[0]?.committed_at || toIso(repo.pushed_at)]
     );
     return { ok: true, event, repo: repo.full_name, commits: inserted };
   }

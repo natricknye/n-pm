@@ -281,7 +281,7 @@ npm test
 npm run build
 ```
 
-当前测试：auth 2 项 + GitHub 分类/可见性 4 项 = 6 项，另有 mock smoke 和 live smoke。
+当前测试：auth 2 项 + GitHub 分类/可见性/时间戳 5 项 = 7 项，另有 mock smoke 和 live smoke。
 
 ### Windows 符号链接坑
 
@@ -392,3 +392,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-webhooks.ps1
 - 2026-11-25：公开仓库 `https://github.com/natricknye/n-pm` 已创建并推送；N/PM 品牌、README/DEVELOPMENT、公开/私有边界完成。尚未部署：需要 Neon `DATABASE_URL`、Vercel 项目/环境变量、GitHub PAT 与 webhook secret；Vercel API 网络当前超时。
 - 2026-11-25：完成生产部署。Vercel `nate-pm` + Neon Marketplace `n-pm-db` + schema；9 个仓库、70 条 commit 已同步；9 个仓库 webhook 已建；Production 环境变量齐全。新增 `scripts/load-env.mjs`、`sync.mjs`、`dev-server.mjs`、`setup-webhooks.ps1`；修复 `/api/admin/commits/:id/:sha/diff` 路由下标 bug；真实环境冒烟通过（公开 6 / 登录 9 / diff 866 字符 / 退出 401）。仅剩阿里云 `pm` CNAME。
 - 2026-11-25：阿里云 CNAME 已添加并生效，HTTPS 正常。前端改为白亮主题；看板按“已上传 GitHub / 未上传 GitHub”分区，项目卡片在主区直接点开；新增本地项目创建/删除和 `local_path`；Dela/opencode 作为可见 Contribute；新增 `seed:local`、`clean:smoke`、favicon 和 Vercel 嵌套 API rewrite。线上冒烟通过：公开 9、登录 10、本地表单创建/删除、Contribute 2、diff 866 字符。
+- 2026-11-25：修复 GitHub push webhook 500。webhook 的 `repository.pushed_at` 是 Unix 秒，REST API 是 ISO 字符串；`mapRepo`/push handler 统一转 ISO 后再写 `timestamptz`，新增时间戳单测，测试 7/7。webhook ping 和真实 push 投递需为 200。

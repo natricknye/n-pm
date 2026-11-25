@@ -68,7 +68,7 @@ Vercel 部署 `READY`；Neon schema 已迁移；首次同步得到 9 个仓库�
 - 本地项目详情：显示“本地项目”和本地路径，隐藏 Commits 标签。
 - 本地项目表单：UI 创建 → 列表出现 → API 删除成功。
 - 任务/笔记/commit diff/同步状态/退出 401 全部通过。
-- `npm test`：6/6；`npm run build`：通过。
+- `npm test`：7/7；`npm run build`：通过。
 
 ### 还没做
 

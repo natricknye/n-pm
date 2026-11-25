@@ -44,6 +44,13 @@ test('fork is contribute and visible unless private or archived', () => {
   assert.equal(mapped.visible, true);
 });
 
+test('webhook-style numeric pushed_at becomes ISO and stays active', () => {
+  const mapped = mapRepo(repo({ id: 7, pushed_at: Math.floor(Date.now() / 1000) }));
+  assert.equal(mapped.status, 'active');
+  assert.match(mapped.last_commit_at, /^\d{4}-\d{2}-\d{2}T.*Z$/);
+  assert.ok(Date.now() - new Date(mapped.last_commit_at).getTime() < 60_000);
+});
+
 test('private and archived repos are hidden; old repos are paused', () => {
   const priv = mapRepo(repo({ id: 4, private: true }));
   assert.equal(priv.visible, false);
